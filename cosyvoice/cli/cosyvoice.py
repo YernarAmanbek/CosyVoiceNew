@@ -107,14 +107,16 @@ class CosyVoice:
             ## TO delete
             print('OPTIONAL CURRENT: (from profile) synthesis text {} too short than prompt text {}, this may lead to bad performance')
             ## TO delete
-            start_time = time.time()
+            tts_text_token, tts_text_token_len = self.frontend._extract_text_token(i)
+            
+            model_input['text'] = tts_text_token
+            model_input['text_len'] = tts_text_token_len
             logging.info('synthesis text {}'.format(i))
             for model_output in self.model.tts(**model_input, stream=stream, speed=speed):
                 speech_len = model_output['tts_speech'].shape[1] / self.sample_rate
                 logging.info('yield speech len {}, rtf {}'.format(speech_len, (time.time() - start_time) / speech_len))
                 yield model_output
-                start_time = time.time()
-                
+
     def inference_cross_lingual(self, tts_text, prompt_wav, zero_shot_spk_id='', stream=False, speed=1.0, text_frontend=True):
         for i in tqdm(self.frontend.text_normalize(tts_text, split=True, text_frontend=text_frontend)):
             model_input = self.frontend.frontend_cross_lingual(i, prompt_wav, self.sample_rate, zero_shot_spk_id)
