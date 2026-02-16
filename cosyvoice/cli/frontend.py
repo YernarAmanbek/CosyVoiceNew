@@ -187,6 +187,39 @@ class CosyVoiceFrontEnd:
         model_input['text'] = tts_text_token
         model_input['text_len'] = tts_text_token_len
         return model_input
+        
+    def save_voice_profile(self, prompt_wav, prompt_text, save_path, resample_rate):
+        # 1. Extract all the heavy features
+        prompt_text_token, prompt_text_token_len = self._extract_text_token(prompt_text)
+        speech_feat, speech_feat_len = self._extract_speech_feat(prompt_wav)
+        speech_token, speech_token_len = self._extract_speech_token(prompt_wav)
+        embedding = self._extract_spk_embedding(prompt_wav)
+    
+        # 2. Apply the CosyVoice2 alignment fix (from your original code)
+        if resample_rate == 24000:
+            token_len = min(int(speech_feat.shape[1] / 2), speech_token.shape[1])
+            speech_feat = speech_feat[:, :2 * token_len]
+            speech_feat_len[:] = 2 * token_len
+            speech_token = speech_token[:, :token_len]
+            speech_token_len[:] = token_len
+    
+        # 3. Pack into a dictionary
+        voice_profile = {
+            'prompt_text': prompt_text_token,
+            'prompt_text_len': prompt_text_token_len,
+            'llm_prompt_speech_token': speech_token,
+            'llm_prompt_speech_token_len': speech_token_len,
+            'flow_prompt_speech_token': speech_token,
+            'flow_prompt_speech_token_len': speech_token_len,
+            'prompt_speech_feat': speech_feat,
+            'prompt_speech_feat_len': speech_feat_len,
+            'llm_embedding': embedding,
+            'flow_embedding': embedding
+        }
+    
+        # 4. Save to disk (e.g., 'my_custom_voice.pt')
+        torch.save(voice_profile, save_path)
+        print(f"Voice profile saved to {save_path}")
 
     def frontend_cross_lingual(self, tts_text, prompt_wav, resample_rate, zero_shot_spk_id):
         model_input = self.frontend_zero_shot(tts_text, '', prompt_wav, resample_rate, zero_shot_spk_id)
