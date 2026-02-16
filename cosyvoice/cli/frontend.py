@@ -117,6 +117,21 @@ class CosyVoiceFrontEnd:
         embedding = torch.tensor([embedding]).to(self.device)
         return embedding
 
+    def _extract_spk_embedding_mp3(self, prompt_wav):
+        speech, sample_rate = torchaudio.load(prompt_wav)
+        if sample_rate != 16000:
+            audio = torchaudio.transforms.Resample(orig_freq=sample_rate, new_freq=16000)(audio)
+        feat = kaldi.fbank(speech,
+                           num_mel_bins=80,
+                           dither=0,
+                           sample_frequency=16000)
+        feat = feat - feat.mean(dim=0, keepdim=True)
+        embedding = self.campplus_session.run(None,
+                                              {self.campplus_session.get_inputs()[0].name: feat.unsqueeze(dim=0).cpu().numpy()})[0].flatten().tolist()
+        embedding = torch.tensor([embedding]).to(self.device)
+        return embedding
+
+    
     def _extract_speech_feat(self, prompt_wav):
         speech = load_wav(prompt_wav, 24000)
         speech_feat = self.feat_extractor(speech).squeeze(dim=0).transpose(0, 1).to(self.device)
@@ -176,7 +191,7 @@ class CosyVoiceFrontEnd:
                 token_len = min(int(speech_feat.shape[1] / 2), speech_token.shape[1])
                 speech_feat, speech_feat_len[:] = speech_feat[:, :2 * token_len], 2 * token_len
                 speech_token, speech_token_len[:] = speech_token[:, :token_len], token_len
-            embedding = self._extract_spk_embedding(prompt_wav)
+            embedding = self._extract_spk_embedding_mp3(prompt_wav)
             model_input = {'prompt_text': prompt_text_token, 'prompt_text_len': prompt_text_token_len,
                            'llm_prompt_speech_token': speech_token, 'llm_prompt_speech_token_len': speech_token_len,
                            'flow_prompt_speech_token': speech_token, 'flow_prompt_speech_token_len': speech_token_len,
